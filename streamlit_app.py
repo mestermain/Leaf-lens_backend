@@ -138,7 +138,7 @@ st.markdown("""
 st.markdown("""
     <div class="navbar-header-custom">
         <div>
-            <h1 class="brand-title">🍃 LeafLens</h1>
+            <h1 class="brand-title" style="color: #ffffff !important; font-weight: 800; font-size: 2.2rem; margin: 0;">🍃 <span style="color: #ffffff !important;">LeafLens</span></h1>
             <p class="brand-tagline">"Leaves tell us the Story"</p>
         </div>
         <div style="text-align: right; color: white;">
