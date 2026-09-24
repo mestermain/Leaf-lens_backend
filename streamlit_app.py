@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import sys
 import io
+import gc
 import base64
 import numpy as np
 import pandas as pd
@@ -57,7 +58,28 @@ def validate_leaf_image(pil_img):
     return True, "Valid leaf image"
 
 # ---------------------------------------------------------------------
-# COMPLETE BOOTSTRAP 5, FONTAWESOME & EXACT CSS STYLING FROM LEAFLENS.GIT
+# LAZY CACHED MODEL LOADERS (MEMORY & RAM OPTIMIZED FOR STREAMLIT CLOUD)
+# ---------------------------------------------------------------------
+@st.cache_resource
+def get_4_class_models():
+    from app import build_4_class_vit, StandardGradCAMViT, std_transform, device, CLASS_NAMES_4, CLASS_INFO, torch
+    vit = build_4_class_vit()
+    target_layer = vit.encoder.layers[-1].ln_1
+    cam_engine = StandardGradCAMViT(vit, target_layer)
+    return vit, cam_engine, std_transform, device, CLASS_NAMES_4, CLASS_INFO, torch
+
+@st.cache_resource
+def get_10_class_models():
+    from app import build_10_class_models, GradCAMPlusPlus, std_transform, inc_transform, device, CLASS_NAMES_10, CLASS_INFO, meta_learner_10, torch
+    models_dict = build_10_class_models()
+    cam_engine = None
+    if 'vgg' in models_dict:
+        target_layer = models_dict['vgg'].features[49]
+        cam_engine = GradCAMPlusPlus(models_dict['vgg'], target_layer)
+    return models_dict, cam_engine, std_transform, inc_transform, device, CLASS_NAMES_10, CLASS_INFO, meta_learner_10, torch
+
+# ---------------------------------------------------------------------
+# BOOTSTRAP 5 & CUSTOM GREEN CSS STYLING
 # ---------------------------------------------------------------------
 st.markdown(f"""
     <!-- Bootstrap 5 CSS & FontAwesome -->
@@ -85,7 +107,6 @@ st.markdown(f"""
         color: var(--text-dark);
       }}
 
-      /* Navbar Green & White */
       .navbar-custom {{
         background-color: var(--dark-green);
         border-bottom: 3px solid var(--mint-green);
@@ -129,7 +150,6 @@ st.markdown(f"""
         margin-bottom: 0;
       }}
 
-      /* Pure White & Green Card Design */
       .card-custom {{
         background-color: var(--pure-white);
         border: 1px solid var(--border-green);
@@ -137,15 +157,6 @@ st.markdown(f"""
         box-shadow: 0 8px 24px rgba(27, 67, 50, 0.07);
         padding: 1.5rem;
         margin-bottom: 1.5rem;
-      }}
-
-      /* Drag and Drop Zone */
-      .drop-zone {{
-        border: 2px dashed var(--forest-green);
-        border-radius: 14px;
-        padding: 30px 20px;
-        text-align: center;
-        background-color: var(--pale-green);
       }}
 
       .btn-green {{
@@ -158,10 +169,6 @@ st.markdown(f"""
         box-shadow: 0 4px 12px rgba(27, 67, 50, 0.2);
         width: 100%;
         text-align: center;
-      }}
-
-      .btn-green:hover {{
-        background-color: var(--forest-green);
       }}
 
       .badge-confidence {{
@@ -196,7 +203,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# NAVBAR (MATCHING VERCEL NAVBAR EXACTLY)
+# NAVBAR
 # ---------------------------------------------------------------------
 st.markdown(f"""
     <div class="navbar-custom">
@@ -211,7 +218,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# HERO HEADER BANNER (MATCHING VERCEL HERO EXACTLY)
+# HERO HEADER BANNER
 # ---------------------------------------------------------------------
 st.markdown(f"""
     <div class="text-center my-3">
@@ -226,15 +233,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# IMPORT PYTORCH BACKEND & MODELS
-# ---------------------------------------------------------------------
-try:
-    from app import std_transform, inc_transform, device, CLASS_NAMES_10, CLASS_NAMES_4, CLASS_INFO, models_10, vit_4, gradcam_engine_10, gradcam_engine_4, torch
-except Exception as e:
-    st.error(f"Error initializing PyTorch AI backend models: {e}")
-
-# ---------------------------------------------------------------------
-# DUAL MODEL TABS SWITCHER (MATCHING VERCEL TABS EXACTLY)
+# DUAL MODEL TABS SWITCHER
 # ---------------------------------------------------------------------
 tab_mode = st.radio(
     "Select Model Mode",
@@ -263,7 +262,7 @@ else:
     """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# MAIN LAYOUT (LEFT UPLOAD COLUMN & RIGHT RESULTS COLUMN)
+# MAIN LAYOUT
 # ---------------------------------------------------------------------
 col_left, col_right = st.columns([5, 7], gap="medium")
 
@@ -315,7 +314,7 @@ with col_right:
         image_bytes = uploaded_file.getvalue()
         pil_img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
 
-        # 1. RUN LEAF VALIDATION ENGINE
+        # 1. LEAF VALIDATION ENGINE
         is_valid_leaf, validation_reason = validate_leaf_image(pil_img)
 
         if not is_valid_leaf:
@@ -331,15 +330,15 @@ with col_right:
                 </div>
             """, unsafe_allow_html=True)
         else:
-            with st.spinner("LeafLens is Analyzing Coffee Leaf... Evaluating deep feature maps across VGG19, InceptionV3, DenseNet201, MobileNetV3, ViT-B/16 & EfficientNet-B4 + generating Grad-CAM++ heatmaps..."):
+            with st.spinner("Evaluating deep feature maps & generating Grad-CAM heatmaps..."):
                 cv_img_rgb = np.array(pil_img)
                 h, w, _ = cv_img_rgb.shape
 
-                input_std = std_transform(pil_img).unsqueeze(0).to(device)
-                input_inc = inc_transform(pil_img).unsqueeze(0).to(device)
-
+                # 2. LAZY MODEL INFERENCE (RAM OPTIMIZED)
                 if tab_mode == '4_class':
+                    vit_4, gradcam_engine_4, std_transform, device, CLASS_NAMES_4, CLASS_INFO, torch = get_4_class_models()
                     class_names = CLASS_NAMES_4
+                    input_std = std_transform(pil_img).unsqueeze(0).to(device)
                     cam, logits, pred_idx = gradcam_engine_4.generate(input_std)
                     probs = torch.softmax(torch.tensor(logits), dim=0).numpy()
                     predicted_class = class_names[pred_idx]
@@ -347,7 +346,11 @@ with col_right:
                     final_probs = probs
                     models_summary = {'Vision Transformer (ViT)': {'class': predicted_class, 'confidence': round(confidence, 2)}}
                 else:
+                    models_10, gradcam_engine_10, std_transform, inc_transform, device, CLASS_NAMES_10, CLASS_INFO, meta_learner_10, torch = get_10_class_models()
                     class_names = CLASS_NAMES_10
+                    input_std = std_transform(pil_img).unsqueeze(0).to(device)
+                    input_inc = inc_transform(pil_img).unsqueeze(0).to(device)
+
                     probs_dict = {}
                     if 'vgg' in models_10:
                         with torch.no_grad(): probs_dict['vgg'] = torch.softmax(models_10['vgg'](input_std), dim=1).cpu().numpy()[0]
@@ -393,7 +396,7 @@ with col_right:
 
                 info = CLASS_INFO.get(predicted_class, {'title': predicted_class, 'desc': 'Coffee deficiency', 'action': 'Consult specialist.'})
 
-                # Primary Diagnosis Card (Matching Vercel EXACT layout)
+                # Primary Diagnosis Card
                 st.markdown(f"""
                     <div class="card card-custom p-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -405,7 +408,7 @@ with col_right:
                     </div>
                 """, unsafe_allow_html=True)
 
-                # Side-by-Side Images (Matching Vercel EXACT layout)
+                # Side-by-Side Images
                 img_c1, img_c2 = st.columns(2)
                 with img_c1:
                     st.markdown("""
@@ -424,7 +427,7 @@ with col_right:
                     """, unsafe_allow_html=True)
                     st.image(overlay, use_container_width=True)
 
-                # Detailed Agronomic Analysis & Remedy Plan (Matching Vercel EXACT layout)
+                # Detailed Agronomic Analysis & Remedy Plan
                 st.markdown(f"""
                     <div class="card card-custom p-4 mt-3">
                         <h5 class="fw-bold text-dark mb-3">
@@ -441,7 +444,7 @@ with col_right:
                     </div>
                 """, unsafe_allow_html=True)
 
-                # Class Probability Distribution Progress Bars (Matching Vercel EXACT layout)
+                # Class Probability Distribution Progress Bars
                 st.markdown("""
                     <div class="card card-custom p-4 mt-3">
                         <h5 class="fw-bold text-dark mb-3">
@@ -466,7 +469,7 @@ with col_right:
 
                 st.markdown("</div>", unsafe_allow_html=True)
 
-                # Ensemble Sub-Model Agreement Table (Matching Vercel EXACT layout)
+                # Ensemble Sub-Model Agreement Table
                 if tab_mode == '10_class' and models_summary:
                     st.markdown("""
                         <div class="card card-custom p-4 mt-3">
@@ -478,8 +481,10 @@ with col_right:
                     summary_df = [{'Model Architecture': k, 'Predicted Class': v['class'], 'Confidence (%)': f"{v['confidence']:.2f}% / 100%"} for k, v in models_summary.items()]
                     st.table(pd.DataFrame(summary_df))
 
+                # Purge unused RAM tensors
+                gc.collect()
+
     else:
-        # Default Placeholder State Matching Vercel EXACT layout
         st.markdown("""
             <div class="card card-custom p-5 text-center">
                 <i class="fa-solid fa-seedling text-success display-1 mb-3"></i>
