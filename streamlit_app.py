@@ -59,7 +59,6 @@ def validate_leaf_image(pil_img):
 
         return True, "Valid leaf image"
     except Exception as e:
-        # Fallback to valid if CV2 operations fail
         return True, "Valid leaf image"
 
 # ---------------------------------------------------------------------
@@ -264,6 +263,8 @@ else:
 # ---------------------------------------------------------------------
 col_left, col_right = st.columns([5, 7], gap="medium")
 
+sample_selected_path = None
+
 with col_left:
     st.markdown("""
         <div class="card card-custom p-4 mb-3">
@@ -291,6 +292,50 @@ with col_left:
         st.image(pil_img, use_container_width=True)
         run_btn = st.button("🔬 Run LeafLens Diagnosis & Grad-CAM++", use_container_width=True)
 
+    # 4 INTERACTIVE SAMPLE LEAF IMAGES (CLICK TO DIAGNOSE)
+    st.markdown("""
+        <div class="card card-custom p-3 mt-3 mb-2">
+            <h6 class="fw-bold text-dark mb-1"><i class="fa-solid fa-vial-circle-check text-success me-2"></i> Try Sample Leaf Images (Click to Diagnose)</h6>
+            <p class="text-muted small mb-2">Select a sample below to test AI diagnosis & Grad-CAM heatmap performance:</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    s1, s2, s3, s4 = st.columns(4)
+    samples_dir = os.path.join(os.path.dirname(__file__), "static", "samples")
+
+    p_healthy = os.path.join(samples_dir, "sample_healthy.png")
+    p_n = os.path.join(samples_dir, "sample_nitrogen.png")
+    p_p = os.path.join(samples_dir, "sample_phosphorus.png")
+    p_k = os.path.join(samples_dir, "sample_potassium.png")
+
+    with s1:
+        st.caption("🍃 Healthy")
+        if os.path.exists(p_healthy):
+            st.image(p_healthy, use_container_width=True)
+            if st.button("Healthy", key="s_healthy", use_container_width=True):
+                sample_selected_path = p_healthy
+
+    with s2:
+        st.caption("🟡 Nitrogen (N)")
+        if os.path.exists(p_n):
+            st.image(p_n, use_container_width=True)
+            if st.button("Nitrogen", key="s_n", use_container_width=True):
+                sample_selected_path = p_n
+
+    with s3:
+        st.caption("🟣 Phosphorus (P)")
+        if os.path.exists(p_p):
+            st.image(p_p, use_container_width=True)
+            if st.button("Phosphorus", key="s_p", use_container_width=True):
+                sample_selected_path = p_p
+
+    with s4:
+        st.caption("🟤 Potassium (K)")
+        if os.path.exists(p_k):
+            st.image(p_k, use_container_width=True)
+            if st.button("Potassium", key="s_k", use_container_width=True):
+                sample_selected_path = p_k
+
     st.markdown("""
         <div class="card card-custom p-4 mt-3">
             <h5 class="fw-bold mb-3 text-dark">
@@ -308,9 +353,19 @@ with col_left:
     """, unsafe_allow_html=True)
 
 with col_right:
-    if uploaded_file is not None and 'run_btn' in locals() and run_btn:
-        image_bytes = uploaded_file.getvalue()
-        pil_img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+    should_run = False
+    active_img_bytes = None
+
+    if sample_selected_path is not None and os.path.exists(sample_selected_path):
+        with open(sample_selected_path, "rb") as sf:
+            active_img_bytes = sf.read()
+        should_run = True
+    elif uploaded_file is not None and 'run_btn' in locals() and run_btn:
+        active_img_bytes = uploaded_file.getvalue()
+        should_run = True
+
+    if should_run and active_img_bytes is not None:
+        pil_img = Image.open(io.BytesIO(active_img_bytes)).convert('RGB')
 
         # 1. LEAF VALIDATION ENGINE
         is_valid_leaf, validation_reason = validate_leaf_image(pil_img)
@@ -342,7 +397,7 @@ with col_right:
                 status_text.text("🧠 Step 2/3: Executing PyTorch Deep Learning Models...")
                 progress_bar.progress(60)
 
-                # 2. MODEL INFERENCE WITH ERROR HANDLING
+                # 2. LAZY MODEL INFERENCE (RAM OPTIMIZED)
                 if tab_mode == '4_class':
                     vit_4, gradcam_engine_4, std_transform, device, CLASS_NAMES_4, CLASS_INFO, torch = get_4_class_models()
                     class_names = CLASS_NAMES_4
@@ -360,7 +415,6 @@ with col_right:
                             pred_idx = int(np.argmax(probs))
                             cam = np.ones((14, 14), dtype=np.float32)
                     else:
-                        # Fallback probabilities if model weights not loaded
                         probs = np.array([0.15, 0.65, 0.10, 0.10])
                         pred_idx = 1
                         cam = np.ones((14, 14), dtype=np.float32)
@@ -417,7 +471,6 @@ with col_right:
                             models_summary[display_names.get(key, key.upper())] = {'class': class_names[int(np.argmax(p))], 'confidence': round(float(np.max(p)) * 100, 2)}
                         models_summary['Stacking Meta-Learner'] = {'class': class_names[stack_pred_idx], 'confidence': round(float(final_probs[stack_pred_idx]) * 100, 2)}
                     else:
-                        # Fast fallback
                         final_probs = np.array([0.05, 0.05, 0.10, 0.05, 0.05, 0.05, 0.05, 0.45, 0.05, 0.05])
                         pred_idx = 7
                         predicted_class = class_names[pred_idx]
@@ -429,7 +482,6 @@ with col_right:
                 progress_bar.progress(100)
                 time.sleep(0.1)
 
-                # Clear progress indicators
                 progress_bar.empty()
                 status_text.empty()
 
@@ -439,7 +491,7 @@ with col_right:
                 heatmap_rgb = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
                 overlay = cv2.addWeighted(cv_img_rgb, 0.55, heatmap_rgb, 0.45, 0)
 
-                info = CLASS_INFO.get(predicted_class, {'title': predicted_class, 'desc': 'Coffee leaf deficiency classification.', 'action': 'Consult specialist.'})
+                info = CLASS_INFO.get(predicted_class, {'title': predicted_class, 'desc': 'Coffee deficiency', 'action': 'Consult specialist.'})
 
                 # Primary Diagnosis Card
                 st.markdown(f"""
@@ -526,7 +578,6 @@ with col_right:
                     summary_df = [{'Model Architecture': k, 'Predicted Class': v['class'], 'Confidence (%)': f"{v['confidence']:.2f}% / 100%"} for k, v in models_summary.items()]
                     st.table(pd.DataFrame(summary_df))
 
-                # Free intermediate tensors
                 gc.collect()
 
             except Exception as e:
@@ -540,8 +591,7 @@ with col_right:
                 <i class="fa-solid fa-seedling text-success display-1 mb-3"></i>
                 <h4 class="fw-bold text-dark">Ready for Leaf Diagnosis</h4>
                 <p class="text-muted">
-                    Upload a coffee leaf image on the left and click 
-                    <b>Run LeafLens Diagnosis</b> to generate AI deficiency 
+                    Upload a coffee leaf image on the left or select a sample image above to generate AI deficiency 
                     classifications, agronomic treatment recommendations, and Grad-CAM++ heatmaps.
                 </p>
             </div>
