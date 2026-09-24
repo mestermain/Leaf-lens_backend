@@ -263,8 +263,6 @@ else:
 # ---------------------------------------------------------------------
 col_left, col_right = st.columns([5, 7], gap="medium")
 
-sample_selected_path = None
-
 with col_left:
     st.markdown("""
         <div class="card card-custom p-4 mb-3">
@@ -292,49 +290,7 @@ with col_left:
         st.image(pil_img, use_container_width=True)
         run_btn = st.button("🔬 Run LeafLens Diagnosis & Grad-CAM++", use_container_width=True)
 
-    # 4 INTERACTIVE SAMPLE LEAF IMAGES (CLICK TO DIAGNOSE)
-    st.markdown("""
-        <div class="card card-custom p-3 mt-3 mb-2">
-            <h6 class="fw-bold text-dark mb-1"><i class="fa-solid fa-vial-circle-check text-success me-2"></i> Try Sample Leaf Images (Click to Diagnose)</h6>
-            <p class="text-muted small mb-2">Select a sample below to test AI diagnosis & Grad-CAM heatmap performance:</p>
-        </div>
-    """, unsafe_allow_html=True)
 
-    s1, s2, s3, s4 = st.columns(4)
-    samples_dir = os.path.join(os.path.dirname(__file__), "static", "samples")
-
-    p_healthy = os.path.join(samples_dir, "sample_healthy.png")
-    p_n = os.path.join(samples_dir, "sample_nitrogen.png")
-    p_p = os.path.join(samples_dir, "sample_phosphorus.png")
-    p_k = os.path.join(samples_dir, "sample_potassium.png")
-
-    with s1:
-        st.caption("🍃 Healthy")
-        if os.path.exists(p_healthy):
-            st.image(p_healthy, use_container_width=True)
-            if st.button("Healthy", key="s_healthy", use_container_width=True):
-                sample_selected_path = p_healthy
-
-    with s2:
-        st.caption("🟡 Nitrogen (N)")
-        if os.path.exists(p_n):
-            st.image(p_n, use_container_width=True)
-            if st.button("Nitrogen", key="s_n", use_container_width=True):
-                sample_selected_path = p_n
-
-    with s3:
-        st.caption("🟣 Phosphorus (P)")
-        if os.path.exists(p_p):
-            st.image(p_p, use_container_width=True)
-            if st.button("Phosphorus", key="s_p", use_container_width=True):
-                sample_selected_path = p_p
-
-    with s4:
-        st.caption("🟤 Potassium (K)")
-        if os.path.exists(p_k):
-            st.image(p_k, use_container_width=True)
-            if st.button("Potassium", key="s_k", use_container_width=True):
-                sample_selected_path = p_k
 
     st.markdown("""
         <div class="card card-custom p-4 mt-3">
@@ -356,11 +312,7 @@ with col_right:
     should_run = False
     active_img_bytes = None
 
-    if sample_selected_path is not None and os.path.exists(sample_selected_path):
-        with open(sample_selected_path, "rb") as sf:
-            active_img_bytes = sf.read()
-        should_run = True
-    elif uploaded_file is not None and 'run_btn' in locals() and run_btn:
+    if uploaded_file is not None and 'run_btn' in locals() and run_btn:
         active_img_bytes = uploaded_file.getvalue()
         should_run = True
 
@@ -591,7 +543,7 @@ with col_right:
                 <i class="fa-solid fa-seedling text-success display-1 mb-3"></i>
                 <h4 class="fw-bold text-dark">Ready for Leaf Diagnosis</h4>
                 <p class="text-muted">
-                    Upload a coffee leaf image on the left or select a sample image above to generate AI deficiency 
+                    Upload a coffee leaf image on the left to generate AI deficiency 
                     classifications, agronomic treatment recommendations, and Grad-CAM++ heatmaps.
                 </p>
             </div>
