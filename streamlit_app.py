@@ -9,33 +9,32 @@ from PIL import Image
 import cv2
 
 # ---------------------------------------------------------------------
-# STREAMLIT PAGE CONFIG
+# STREAMLIT PAGE CONFIG & META DATA
 # ---------------------------------------------------------------------
 st.set_page_config(
-    page_title="LeafLens - Coffee Leaf AI Diagnostics",
+    page_title="🍃 LeafLens - Coffee Leaf AI & Grad-CAM Diagnostics",
     page_icon="🌿",
     layout="wide"
 )
+
+# Encode logo to Base64 if available
+logo_b64 = ""
+logo_path = os.path.join(os.path.dirname(__file__), "static", "leaflens_logo.jpg")
+if os.path.exists(logo_path):
+    with open(logo_path, "rb") as f:
+        logo_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode("utf-8")
+else:
+    logo_b64 = "https://raw.githubusercontent.com/mestermain/LeafLens/main/static/leaflens_logo.jpg"
 
 # ---------------------------------------------------------------------
 # LEAF VALIDATION ENGINE (NON-LEAF / OOD DETECTION)
 # ---------------------------------------------------------------------
 def validate_leaf_image(pil_img):
-    """
-    Validates if the uploaded image contains plant/leaf tissue.
-    Checks:
-    1. HSV Green/Yellow/Brown Chlorophyll & Necrosis Color Ratio.
-    2. Texture Edge Density (Laplacian variance).
-    Returns (is_valid: bool, reason: str, metrics: dict)
-    """
     cv_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
     hsv = cv2.cvtColor(cv_img, cv2.COLOR_BGR2HSV)
     
-    # HSV masks for plant tissue:
-    # Green leaves (H: 20-95), Yellow/chlorosis (H: 15-35), Brown/necrosis (H: 5-25)
     lower_green = np.array([18, 18, 18])
     upper_green = np.array([95, 255, 255])
-    
     lower_brown = np.array([4, 18, 18])
     upper_brown = np.array([22, 255, 220])
 
@@ -46,32 +45,28 @@ def validate_leaf_image(pil_img):
     total_pixels = cv_img.shape[0] * cv_img.shape[1]
     plant_pixel_ratio = np.count_nonzero(combined_mask) / total_pixels
     
-    # Edge density check via Laplacian variance
     gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
     laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
 
-    # Criteria for valid leaf:
-    # 1. At least 6% of the image must match leaf/plant color spectrum (green/yellow/brown)
-    # 2. Laplacian variance > 6.0 (not a flat blank/blurry background or solid color)
     if plant_pixel_ratio < 0.06:
-        return False, "The uploaded image does not appear to contain a coffee leaf. The color spectrum lacks plant/chlorophyll tissue tones.", {"ratio": plant_pixel_ratio, "var": laplacian_var}
+        return False, "The uploaded image does not appear to contain a coffee leaf. Color spectrum lacks plant/chlorophyll tissue tones."
 
     if laplacian_var < 6.0:
-        return False, "The image is too blank or blurry to detect leaf vein structures.", {"ratio": plant_pixel_ratio, "var": laplacian_var}
+        return False, "The image is too blank or blurry to detect leaf vein structures."
 
-    return True, "Valid leaf image", {"ratio": plant_pixel_ratio, "var": laplacian_var}
+    return True, "Valid leaf image"
 
 # ---------------------------------------------------------------------
-# BOOTSTRAP 5, FONTAWESOME & CUSTOM GREEN & WHITE CSS
+# COMPLETE BOOTSTRAP 5, FONTAWESOME & EXACT CSS STYLING FROM LEAFLENS.GIT
 # ---------------------------------------------------------------------
-st.markdown("""
+st.markdown(f"""
     <!-- Bootstrap 5 CSS & FontAwesome -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-      :root {
+      :root {{
         --dark-green: #1b4332;
         --forest-green: #2d6a4f;
         --emerald: #40916c;
@@ -82,95 +77,151 @@ st.markdown("""
         --text-dark: #1b4332;
         --text-muted: #4a5d52;
         --border-green: #c7e9d0;
-      }
+      }}
 
-      .stApp {
+      .stApp {{
         background-color: var(--pale-green);
         font-family: 'Plus Jakarta Sans', sans-serif;
-      }
+        color: var(--text-dark);
+      }}
 
-      .navbar-header-custom {
+      /* Navbar Green & White */
+      .navbar-custom {{
         background-color: var(--dark-green);
         border-bottom: 3px solid var(--mint-green);
         box-shadow: 0 4px 15px rgba(27, 67, 50, 0.15);
-        padding: 1rem 2rem;
-        margin-bottom: 2rem;
+        padding: 0.8rem 2rem;
+        margin-bottom: 1.5rem;
         border-radius: 0 0 16px 16px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-      }
+      }}
 
-      .brand-title {
+      .brand-logo-img {{
+        height: 46px;
+        width: 46px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--mint-green);
+      }}
+
+      .brand-title-text {{
         color: #ffffff !important;
         font-weight: 800;
-        font-size: 2.2rem;
+        font-size: 1.8rem;
         margin: 0;
-        letter-spacing: -0.5px;
-      }
+      }}
 
-      .brand-tagline {
-        color: var(--mint-green);
-        font-style: italic;
-        font-weight: 600;
-        font-size: 1.1rem;
-        margin: 0;
-      }
+      .hero-logo-img {{
+        height: 90px;
+        width: 90px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid var(--forest-green);
+        box-shadow: 0 6px 18px rgba(27, 67, 50, 0.15);
+      }}
 
-      .card-custom {
+      .hero-title {{
+        font-weight: 800;
+        color: var(--dark-green);
+        font-size: 2.5rem;
+        margin-bottom: 0;
+      }}
+
+      /* Pure White & Green Card Design */
+      .card-custom {{
         background-color: var(--pure-white);
         border: 1px solid var(--border-green);
         border-radius: 16px;
         box-shadow: 0 8px 24px rgba(27, 67, 50, 0.07);
         padding: 1.5rem;
         margin-bottom: 1.5rem;
-      }
+      }}
 
-      .badge-confidence {
-        background-color: var(--light-green);
-        color: var(--dark-green);
-        font-size: 1.1rem;
-        font-weight: 800;
-        padding: 0.5rem 1.25rem;
-        border-radius: 30px;
-        display: inline-block;
-        border: 1px solid var(--mint-green);
-      }
-
-      .guide-box {
+      /* Drag and Drop Zone */
+      .drop-zone {{
+        border: 2px dashed var(--forest-green);
+        border-radius: 14px;
+        padding: 30px 20px;
+        text-align: center;
         background-color: var(--pale-green);
-        border-left: 4px solid var(--forest-green);
-        border-radius: 8px;
-        padding: 1rem;
-      }
+      }}
 
-      .progress-custom-bg {
-        height: 10px;
-        background-color: #e9f5ec;
-        border-radius: 20px;
+      .btn-green {{
+        background-color: var(--dark-green);
+        color: var(--pure-white) !important;
+        border: none;
+        font-weight: 700;
+        border-radius: 10px;
+        padding: 12px 24px;
+        box-shadow: 0 4px 12px rgba(27, 67, 50, 0.2);
+        width: 100%;
+        text-align: center;
+      }}
+
+      .btn-green:hover {{
+        background-color: var(--forest-green);
+      }}
+
+      .badge-confidence {{
+        font-size: 1.05rem;
+        padding: 8px 18px;
+        border-radius: 30px;
+        background-color: var(--dark-green);
+        color: var(--pure-white);
+        font-weight: 700;
+      }}
+
+      .progress-custom-bg {{
+        height: 14px;
+        border-radius: 7px;
+        background-color: var(--light-green);
         overflow: hidden;
-      }
+      }}
 
-      .progress-custom-bar {
+      .progress-custom-bar {{
         height: 100%;
-        background: linear-gradient(90deg, var(--mint-green) 0%, var(--forest-green) 100%);
-        border-radius: 20px;
-      }
+        background-color: var(--forest-green);
+        border-radius: 7px;
+      }}
+
+      .guide-box {{
+        background-color: var(--pale-green);
+        border: 1px solid var(--border-green);
+        border-radius: 12px;
+        padding: 16px;
+      }}
     </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# HEADER BANNER MATCHING VERCEL EXACT NAVBAR
+# NAVBAR (MATCHING VERCEL NAVBAR EXACTLY)
 # ---------------------------------------------------------------------
-st.markdown("""
-    <div class="navbar-header-custom">
-        <div>
-            <h1 class="brand-title" style="color: #ffffff !important; font-weight: 800; font-size: 2.2rem; margin: 0;">🍃 <span style="color: #ffffff !important;">LeafLens</span></h1>
-            <p class="brand-tagline">"Leaves tell us the Story"</p>
+st.markdown(f"""
+    <div class="navbar-custom">
+        <div class="d-flex align-items-center gap-3">
+            <img src="{logo_b64}" alt="LeafLens Logo" class="brand-logo-img">
+            <span class="brand-title-text">LeafLens</span>
         </div>
-        <div style="text-align: right; color: white;">
+        <div class="d-flex align-items-center gap-2">
             <span class="badge bg-success px-3 py-2"><i class="fa-solid fa-microscope me-1"></i> Multi-Model Ensemble & ViT XAI</span>
         </div>
+    </div>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------
+# HERO HEADER BANNER (MATCHING VERCEL HERO EXACTLY)
+# ---------------------------------------------------------------------
+st.markdown(f"""
+    <div class="text-center my-3">
+        <div class="d-flex align-items-center justify-content-center gap-3 mb-2">
+            <img src="{logo_b64}" alt="LeafLens Brand Logo" class="hero-logo-img">
+            <h1 class="hero-title">LeafLens Diagnostics</h1>
+        </div>
+        <p class="fs-5 mt-2 fw-semibold" style="font-style: italic; color: #2d6a4f;">
+            "Leaves tell us the Story"
+        </p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -183,66 +234,77 @@ except Exception as e:
     st.error(f"Error initializing PyTorch AI backend models: {e}")
 
 # ---------------------------------------------------------------------
-# MODEL TAB SELECTION
+# DUAL MODEL TABS SWITCHER (MATCHING VERCEL TABS EXACTLY)
 # ---------------------------------------------------------------------
 tab_mode = st.radio(
     "Select Model Mode",
     ["10_class", "4_class"],
-    format_func=lambda x: "🔬 10-Class Complete Deficiency Model (Ensemble)" if x == "10_class" else "⚡ 4-Class Vision Transformer (ViT)",
+    format_func=lambda x: "🔬 10-Class Full Diagnosis Model (Ensemble)" if x == "10_class" else "⚡ 4-Class Vision Transformer (ViT) Model",
     horizontal=True
 )
 
 if tab_mode == "10_class":
     st.markdown("""
-        <div class="alert alert-success d-flex align-items-center mb-4" style="border-radius: 12px; background-color: #d8f3dc; color: #1b4332; border: 1px solid #52b788;">
-            <i class="fa-solid fa-circle-info fs-4 me-3"></i>
-            <div>
-                Active Model Mode: <strong>10-Class Complete Deficiency Ensemble</strong> (Boron, Calcium, Healthy, Iron, Magnesium, Manganese, Complex, Nitrogen, Phosphorus, Potassium) with <strong>Grad-CAM++</strong> Explainable AI.
+        <div class="card card-custom p-3 mb-4 text-center">
+            <div class="small text-muted fw-semibold">
+                <i class="fa-solid fa-circle-info text-success me-1"></i> Active Model Mode: 
+                <strong>10-Class Complete Deficiency Ensemble</strong> (Boron, Calcium, Healthy, Iron, Magnesium, Manganese, Complex, Nitrogen, Phosphorus, Potassium) with <strong>Grad-CAM++</strong> Explainable AI.
             </div>
         </div>
     """, unsafe_allow_html=True)
 else:
     st.markdown("""
-        <div class="alert alert-success d-flex align-items-center mb-4" style="border-radius: 12px; background-color: #d8f3dc; color: #1b4332; border: 1px solid #52b788;">
-            <i class="fa-solid fa-flask fs-4 me-3"></i>
-            <div>
-                Active Model Mode: <strong>4-Class Vision Transformer (ViT) Model</strong> (Healthy, Nitrogen [N], Phosphorus [P], Potassium [K]) with <strong>Standard Grad-CAM</strong> Explainable AI.
+        <div class="card card-custom p-3 mb-4 text-center">
+            <div class="small text-muted fw-semibold">
+                <i class="fa-solid fa-flask text-success me-1"></i> Active Model Mode: 
+                <strong>4-Class Vision Transformer (ViT) Model</strong> (Healthy, Nitrogen [N], Phosphorus [P], Potassium [K]) with <strong>Standard Grad-CAM</strong> Explainable AI.
             </div>
         </div>
     """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# TWO-COLUMN MAIN LAYOUT
+# MAIN LAYOUT (LEFT UPLOAD COLUMN & RIGHT RESULTS COLUMN)
 # ---------------------------------------------------------------------
 col_left, col_right = st.columns([5, 7], gap="medium")
 
 with col_left:
     st.markdown("""
-        <div class="card-custom">
-            <h5 class="fw-bold mb-3 text-dark"><i class="fa-solid fa-upload text-success me-2"></i> Upload Coffee Leaf Image</h5>
+        <div class="card card-custom p-4 mb-3">
+            <h4 class="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
+                <i class="fa-solid fa-cloud-arrow-up text-success"></i> Upload Leaf Image
+            </h4>
+            <div class="alert alert-warning border-warning p-2 mb-3 rounded-3 small d-flex align-items-center gap-2" style="background-color: #fff9e6; border: 1px solid #ffe082; color: #856404;">
+                <i class="fa-solid fa-lightbulb text-warning fs-5"></i>
+                <div>
+                    <strong>Important Instruction:</strong> The background of the image should be <strong>white</strong> or place a <strong>white paper</strong> in the background of the leaf image for accurate diagnosis.
+                </div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
-    
+
     uploaded_file = st.file_uploader(
-        "Choose leaf image (JPG/PNG)",
+        "Choose leaf image",
         type=["jpg", "jpeg", "png"],
         label_visibility="collapsed"
     )
 
     if uploaded_file is not None:
         pil_img = Image.open(uploaded_file).convert('RGB')
-        st.image(pil_img, caption="Uploaded Image", use_container_width=True)
-        run_btn = st.button("🔬 Run LeafLens Diagnosis & Grad-CAM Heatmap", use_container_width=True)
+        st.markdown("<h6 class='fw-bold text-dark mb-2'>Selected Image Preview:</h6>", unsafe_allow_html=True)
+        st.image(pil_img, use_container_width=True)
+        run_btn = st.button("🔬 Run LeafLens Diagnosis & Grad-CAM++", use_container_width=True)
 
     st.markdown("""
-        <div class="card-custom mt-3">
-            <h5 class="fw-bold mb-3 text-dark"><i class="fa-solid fa-camera text-success me-2"></i> Image Capture Guidelines</h5>
+        <div class="card card-custom p-4 mt-3">
+            <h5 class="fw-bold mb-3 text-dark">
+                <i class="fa-solid fa-camera text-success me-2"></i> Image Capture Guidelines
+            </h5>
             <div class="guide-box small">
                 <ul class="mb-0 ps-3">
                     <li class="mb-2"><strong>White or White Paper Background:</strong> The background of the leaf image should be plain white, or place a sheet of clean white paper in the background behind the leaf.</li>
                     <li class="mb-2"><strong>Single Leaf Focus:</strong> Position one coffee leaf flat in the center, covering 70-80% of the frame.</li>
                     <li class="mb-2"><strong>Natural Lighting:</strong> Shoot under bright indirect daylight; avoid strong shadows or flash.</li>
-                    <li class="mb-2"><strong>Adaxial Surface:</strong> Ensure the top face of the leaf is clearly visible showing chlorosis patterns.</li>
+                    <li class="mb-2"><strong>Adaxial Surface:</strong> Ensure the top face of the leaf is clearly visible showing chlorosis vein patterns and necrotic spot lesions.</li>
                 </ul>
             </div>
         </div>
@@ -252,13 +314,13 @@ with col_right:
     if uploaded_file is not None and 'run_btn' in locals() and run_btn:
         image_bytes = uploaded_file.getvalue()
         pil_img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-        
-        # 1. RUN LEAF VALIDATION ENGINE FIRST
-        is_valid_leaf, validation_reason, metrics = validate_leaf_image(pil_img)
-        
+
+        # 1. RUN LEAF VALIDATION ENGINE
+        is_valid_leaf, validation_reason = validate_leaf_image(pil_img)
+
         if not is_valid_leaf:
             st.markdown(f"""
-                <div class="card-custom p-4 text-center" style="border-left: 6px solid #dc3545; background-color: #fff5f5;">
+                <div class="card card-custom p-4 text-center" style="border-left: 6px solid #dc3545; background-color: #fff5f5;">
                     <i class="fa-solid fa-triangle-exclamation text-danger display-3 mb-3"></i>
                     <h3 class="fw-bold text-danger mb-2">Invalid Image Detected</h3>
                     <p class="text-dark fs-6"><b>{validation_reason}</b></p>
@@ -269,7 +331,7 @@ with col_right:
                 </div>
             """, unsafe_allow_html=True)
         else:
-            with st.spinner("Evaluating deep feature maps across VGG19, InceptionV3, DenseNet201, MobileNetV3, ViT-B/16 & EfficientNet-B4 + generating Grad-CAM heatmaps..."):
+            with st.spinner("LeafLens is Analyzing Coffee Leaf... Evaluating deep feature maps across VGG19, InceptionV3, DenseNet201, MobileNetV3, ViT-B/16 & EfficientNet-B4 + generating Grad-CAM++ heatmaps..."):
                 cv_img_rgb = np.array(pil_img)
                 h, w, _ = cv_img_rgb.shape
 
@@ -331,57 +393,60 @@ with col_right:
 
                 info = CLASS_INFO.get(predicted_class, {'title': predicted_class, 'desc': 'Coffee deficiency', 'action': 'Consult specialist.'})
 
-                # Primary Diagnosis Card
+                # Primary Diagnosis Card (Matching Vercel EXACT layout)
                 st.markdown(f"""
-                    <div class="card-custom">
+                    <div class="card card-custom p-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <span class="badge bg-success px-3 py-2" style="font-size:0.9rem;"><i class="fa-solid fa-circle-check me-1"></i> Diagnosis Complete</span>
-                            <div class="badge-confidence">{confidence:.2f}% / 100% Probability</div>
+                            <span class="badge bg-success px-3 py-2"><i class="fa-solid fa-circle-check me-1"></i> Diagnosis Complete</span>
+                            <span class="badge-confidence">{confidence:.2f}% / 100% Probability</span>
                         </div>
-                        <h2 class="fw-bold text-dark mb-1">{info['title']}</h2>
+                        <h2 class="display-6 fw-bold text-dark mb-1">{info['title']}</h2>
                         <p class="text-muted mb-0 small">Predicted Deficiency Category</p>
                     </div>
                 """, unsafe_allow_html=True)
 
-                # Side-by-Side Images
+                # Side-by-Side Images (Matching Vercel EXACT layout)
                 img_c1, img_c2 = st.columns(2)
                 with img_c1:
                     st.markdown("""
-                        <div class="card-custom p-2 text-center">
-                            <h6 class="fw-bold text-dark mb-2">Original Leaf Image</h6>
+                        <div class="card card-custom p-2 text-center mb-2">
+                            <h6 class="fw-bold text-dark mb-0">Original Leaf Image</h6>
                         </div>
                     """, unsafe_allow_html=True)
                     st.image(pil_img, use_container_width=True)
 
                 with img_c2:
-                    xai_name = "Grad-CAM++ Attention Heatmap" if tab_mode == '10_class' else "Grad-CAM Attention Heatmap"
+                    xai_name = "Grad-CAM++ Attention Heatmap (Higher-Order Gradients)" if tab_mode == '10_class' else "Grad-CAM Attention Heatmap (1st Order Gradients)"
                     st.markdown(f"""
-                        <div class="card-custom p-2 text-center">
-                            <h6 class="fw-bold text-dark mb-2">{xai_name}</h6>
+                        <div class="card card-custom p-2 text-center mb-2">
+                            <h6 class="fw-bold text-dark mb-0">{xai_name}</h6>
                         </div>
                     """, unsafe_allow_html=True)
                     st.image(overlay, use_container_width=True)
 
-                # Detailed Agronomic Recommendations
+                # Detailed Agronomic Analysis & Remedy Plan (Matching Vercel EXACT layout)
                 st.markdown(f"""
-                    <div class="card-custom mt-3">
-                        <h5 class="fw-bold text-dark mb-2"><i class="fa-solid fa-clipboard-list text-success me-2"></i> Agronomic Analysis & Remedy Plan</h5>
-                        <div class="mb-3">
-                            <h6 class="fw-bold text-success mb-1">Symptom Description:</h6>
-                            <p class="text-dark small mb-0">{info['desc']}</p>
+                    <div class="card card-custom p-4 mt-3">
+                        <h5 class="fw-bold text-dark mb-3">
+                            <i class="fa-solid fa-clipboard-list text-success me-2"></i> Agronomic Analysis & Remedy Plan
+                        </h5>
+                        <div class="alert alert-info-custom p-3 mb-3">
+                            <h6 class="fw-bold text-dark mb-1">Symptom Description:</h6>
+                            <p class="mb-0 small">{info['desc']}</p>
                         </div>
-                        <div>
-                            <h6 class="fw-bold text-success mb-1">Recommended Treatment & Action:</h6>
-                            <p class="text-dark small mb-0"><b>{info['action']}</b></p>
+                        <div class="alert alert-info-custom p-3 mb-0">
+                            <h6 class="fw-bold text-dark mb-1">Recommended Treatment & Remedial Action:</h6>
+                            <p class="mb-0 small"><b>{info['action']}</b></p>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
 
-                # Probability Distribution Bars
+                # Class Probability Distribution Progress Bars (Matching Vercel EXACT layout)
                 st.markdown("""
-                    <div class="card-custom mt-3">
-                        <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-chart-bar text-success me-2"></i> Class Probability Distribution (Scaled out of 100%)</h5>
-                    </div>
+                    <div class="card card-custom p-4 mt-3">
+                        <h5 class="fw-bold text-dark mb-3">
+                            <i class="fa-solid fa-chart-bar text-success me-2"></i> Class Probability Distribution (Scaled out of 100%)
+                        </h5>
                 """, unsafe_allow_html=True)
 
                 for idx, cls in enumerate(class_names):
@@ -399,22 +464,30 @@ with col_right:
                         </div>
                     """, unsafe_allow_html=True)
 
-                # Sub-model agreement table for 10-class mode
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                # Ensemble Sub-Model Agreement Table (Matching Vercel EXACT layout)
                 if tab_mode == '10_class' and models_summary:
                     st.markdown("""
-                        <div class="card-custom mt-3">
-                            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-network-wired text-success me-2"></i> Ensemble Sub-Model Diagnosis Agreement</h5>
+                        <div class="card card-custom p-4 mt-3">
+                            <h5 class="fw-bold text-dark mb-3">
+                                <i class="fa-solid fa-network-wired text-success me-2"></i> Ensemble Sub-Model Diagnosis Agreement
+                            </h5>
                         </div>
                     """, unsafe_allow_html=True)
                     summary_df = [{'Model Architecture': k, 'Predicted Class': v['class'], 'Confidence (%)': f"{v['confidence']:.2f}% / 100%"} for k, v in models_summary.items()]
                     st.table(pd.DataFrame(summary_df))
 
     else:
-        # Default Placeholder Card Matching Vercel
+        # Default Placeholder State Matching Vercel EXACT layout
         st.markdown("""
-            <div class="card-custom text-center p-5">
+            <div class="card card-custom p-5 text-center">
                 <i class="fa-solid fa-seedling text-success display-1 mb-3"></i>
                 <h4 class="fw-bold text-dark">Ready for Leaf Diagnosis</h4>
-                <p class="text-muted">Upload a coffee leaf image on the left and click <b>Run LeafLens Diagnosis</b> to generate AI deficiency classifications, agronomic treatment recommendations, and Grad-CAM++ heatmaps.</p>
+                <p class="text-muted">
+                    Upload a coffee leaf image on the left and click 
+                    <b>Run LeafLens Diagnosis</b> to generate AI deficiency 
+                    classifications, agronomic treatment recommendations, and Grad-CAM++ heatmaps.
+                </p>
             </div>
         """, unsafe_allow_html=True)
