@@ -34,12 +34,11 @@ if uploaded_file is not None:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("📷 Uploaded Leaf Image")
-        st.image(uploaded_file, use_column_width=True)
+        st.image(uploaded_file, use_container_width=True)
 
     if st.button("🚀 Run AI Diagnosis & Grad-CAM Heatmap"):
         with st.spinner("Executing PyTorch Ensemble & Grad-CAM Explainable AI..."):
             try:
-                # Perform prediction using internal app logic
                 from app import std_transform, inc_transform, device, CLASS_NAMES_10, CLASS_NAMES_4, CLASS_INFO, models_10, vit_4, gradcam_engine_10, gradcam_engine_4, torch
                 
                 image_bytes = uploaded_file.read()
@@ -98,11 +97,11 @@ if uploaded_file is not None:
 
                 with col2:
                     st.subheader("🔥 Grad-CAM Explainable Heatmap")
-                    st.image(overlay, use_column_width=True)
+                    st.image(overlay, use_container_width=True)
 
                 st.success(f"**Diagnosis**: {info['title']} ({confidence:.2f}% / 100%)")
                 st.markdown(f"**Description**: {info['desc']}")
-                st.markdown(f"**Agronomic Action**: {info['action']}")
+                st.markdown(f"**Action**: {info['action']}")
 
             except Exception as e:
                 st.error(f"Error during inference: {e}")
