@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pth
+*.joblib
+Saved_Models/
+10 classes Model/
+4 classes Model/
+env/
+venv/
+.idea/
+.vscode/
