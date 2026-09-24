@@ -287,6 +287,29 @@ def health():
         '4_class_vit_loaded': vit_4 is not None
     })
 
+def validate_leaf_image(pil_img):
+    cv_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+    hsv = cv2.cvtColor(cv_img, cv2.COLOR_BGR2HSV)
+    lower_green = np.array([18, 18, 18])
+    upper_green = np.array([95, 255, 255])
+    lower_brown = np.array([4, 18, 18])
+    upper_brown = np.array([22, 255, 220])
+
+    mask_green = cv2.inRange(hsv, lower_green, upper_green)
+    mask_brown = cv2.inRange(hsv, lower_brown, upper_brown)
+    combined_mask = cv2.bitwise_or(mask_green, mask_brown)
+
+    total_pixels = cv_img.shape[0] * cv_img.shape[1]
+    plant_pixel_ratio = np.count_nonzero(combined_mask) / total_pixels
+    gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+    laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+
+    if plant_pixel_ratio < 0.06:
+        return False, "Uploaded image does not appear to contain a coffee leaf. Color spectrum lacks plant/chlorophyll tissue."
+    if laplacian_var < 6.0:
+        return False, "Image is too blank or blurry to detect leaf vein structures."
+    return True, "Valid leaf image"
+
 @app.route('/predict', methods=['POST'])
 def predict():
     if 'file' not in request.files:
@@ -299,6 +322,11 @@ def predict():
         image_bytes = file.read()
         pil_img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
         
+        # Validate leaf image first
+        is_valid_leaf, validation_reason = validate_leaf_image(pil_img)
+        if not is_valid_leaf:
+            return jsonify({'success': False, 'error': f'Invalid Image: {validation_reason}'}), 400
+
         cv_img_rgb = np.array(pil_img)
         h, w, _ = cv_img_rgb.shape
         
