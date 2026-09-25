@@ -76,19 +76,7 @@ def get_4_class_models():
         print(f"Error loading 4-class models: {e}")
         return None, None, None, "cpu", ['healthy', 'nitrogen-N', 'phosphorus-P', 'potasium-K'], {}, None
 
-@st.cache_resource
-def get_10_class_models():
-    try:
-        from app import build_10_class_models, GradCAMPlusPlus, std_transform, inc_transform, device, CLASS_NAMES_10, CLASS_INFO, meta_learner_10, torch
-        models_dict = build_10_class_models()
-        cam_engine = None
-        if 'vgg' in models_dict:
-            target_layer = models_dict['vgg'].features[49]
-            cam_engine = GradCAMPlusPlus(models_dict['vgg'], target_layer)
-        return models_dict, cam_engine, std_transform, inc_transform, device, CLASS_NAMES_10, CLASS_INFO, meta_learner_10, torch
-    except Exception as e:
-        print(f"Error loading 10-class models: {e}")
-        return {}, None, None, None, "cpu", ['boron-B', 'calcium-Ca', 'healthy', 'iron-Fe', 'magnesium-Mg', 'manganese-Mn', 'more-deficiencies', 'nitrogen-N', 'phosphorus-P', 'potasium-K'], {}, None, None
+
 
 # ---------------------------------------------------------------------
 # BOOTSTRAP 5 & CUSTOM GREEN CSS STYLING
@@ -230,33 +218,16 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# DUAL MODEL TABS SWITCHER
+# ACTIVE MODEL DISPLAY
 # ---------------------------------------------------------------------
-tab_mode = st.radio(
-    "Select Model Mode",
-    ["10_class", "4_class"],
-    format_func=lambda x: "🔬 10-Class Full Diagnosis Model (Ensemble)" if x == "10_class" else "⚡ 4-Class Vision Transformer (ViT) Model",
-    horizontal=True
-)
-
-if tab_mode == "10_class":
-    st.markdown("""
-        <div class="card card-custom p-3 mb-4 text-center">
-            <div class="small text-muted fw-semibold">
-                <i class="fa-solid fa-circle-info text-success me-1"></i> Active Model Mode: 
-                <strong>10-Class Complete Deficiency Ensemble</strong> (Boron, Calcium, Healthy, Iron, Magnesium, Manganese, Complex, Nitrogen, Phosphorus, Potassium) with <strong>Grad-CAM++</strong> Explainable AI.
-            </div>
+st.markdown("""
+    <div class="card card-custom p-3 mb-4 text-center">
+        <div class="small text-muted fw-semibold">
+            <i class="fa-solid fa-flask text-success me-1"></i> Active Model Mode: 
+            <strong>4-Class Vision Transformer (ViT) Model</strong> (Healthy, Nitrogen [N], Phosphorus [P], Potassium [K]) with <strong>Standard Grad-CAM</strong> Explainable AI.
         </div>
-    """, unsafe_allow_html=True)
-else:
-    st.markdown("""
-        <div class="card card-custom p-3 mb-4 text-center">
-            <div class="small text-muted fw-semibold">
-                <i class="fa-solid fa-flask text-success me-1"></i> Active Model Mode: 
-                <strong>4-Class Vision Transformer (ViT) Model</strong> (Healthy, Nitrogen [N], Phosphorus [P], Potassium [K]) with <strong>Standard Grad-CAM</strong> Explainable AI.
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    </div>
+""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
 # MAIN LAYOUT
@@ -350,7 +321,7 @@ with col_right:
                 progress_bar.progress(60)
 
                 # 2. LAZY MODEL INFERENCE (RAM OPTIMIZED)
-                if tab_mode == '4_class':
+                if True:
                     vit_4, gradcam_engine_4, std_transform, device, CLASS_NAMES_4, CLASS_INFO, torch = get_4_class_models()
                     class_names = CLASS_NAMES_4
                     
@@ -468,7 +439,7 @@ with col_right:
                     st.image(pil_img, use_container_width=True)
 
                 with img_c2:
-                    xai_name = "Grad-CAM++ Attention Heatmap (Higher-Order Gradients)" if tab_mode == '10_class' else "Grad-CAM Attention Heatmap (1st Order Gradients)"
+                    xai_name = "Grad-CAM Attention Heatmap (1st Order Gradients)"
                     st.markdown(f"""
                         <div class="card card-custom p-2 text-center mb-2">
                             <h6 class="fw-bold text-dark mb-0">{xai_name}</h6>
@@ -518,17 +489,7 @@ with col_right:
 
                 st.markdown("</div>", unsafe_allow_html=True)
 
-                # Ensemble Sub-Model Agreement Table
-                if tab_mode == '10_class' and models_summary:
-                    st.markdown("""
-                        <div class="card card-custom p-4 mt-3">
-                            <h5 class="fw-bold text-dark mb-3">
-                                <i class="fa-solid fa-network-wired text-success me-2"></i> Ensemble Sub-Model Diagnosis Agreement
-                            </h5>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    summary_df = [{'Model Architecture': k, 'Predicted Class': v['class'], 'Confidence (%)': f"{v['confidence']:.2f}% / 100%"} for k, v in models_summary.items()]
-                    st.table(pd.DataFrame(summary_df))
+                
 
                 gc.collect()
 
